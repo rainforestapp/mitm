@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -130,20 +131,15 @@ func getCachedCert(ca *tls.Certificate, hosts []string) *tls.Certificate {
 	certMutex.RLock()
 	defer certMutex.RUnlock()
 
-	// Don't try to deal with multiple hosts (dynamically generated
-	// mitm certs only have one host)
-	if len(hosts) != 1 {
-		return nil
-	}
 	if certCache[ca] == nil {
 		return nil
 	}
-	h := hosts[0]
-	cert := certCache[ca][h]
+	key := strings.Join(hosts, ",")
+	cert := certCache[ca][key]
 	if cert == nil {
 		return nil
 	} else if cert.Leaf.NotAfter.Before(time.Now()) {
-		certCache[ca][h] = nil
+		certCache[ca][key] = nil
 		return nil
 	} else {
 		return cert
@@ -154,11 +150,9 @@ func cacheCert(ca *tls.Certificate, hosts []string, cert *tls.Certificate) {
 	certMutex.Lock()
 	defer certMutex.Unlock()
 
-	if len(hosts) != 1 {
-		return
-	}
+	key := strings.Join(hosts, ",")
 	if certCache[ca] == nil || len(certCache[ca]) > maxCacheSize {
 		certCache[ca] = make(map[string]*tls.Certificate)
 	}
-	certCache[ca][hosts[0]] = cert
+	certCache[ca][key] = cert
 }
